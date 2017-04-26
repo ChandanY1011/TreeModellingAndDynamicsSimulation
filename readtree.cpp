@@ -9,7 +9,37 @@
 
 #include "agviewer.c"
 
+#define V struct vector3f
+
 using namespace std;
+
+struct vector3f
+{
+	float x, y, z;
+	vector3f() { };
+	vector3f(float gx, float gy, float gz) : x(gx), y(gy), z(gz) { };
+};
+
+void normalize(V & v)
+{
+	float norm = sqrt((v.x)*(v.x)+(v.y)*(v.y)+(v.z)*(v.z));
+	if(norm > 0.0)
+	{
+		v.x = v.x/norm;
+		v.y = v.y/norm;
+		v.z = v.z/norm;
+	}
+}
+
+float dotproduct(V v1, V v2) {
+	float ret = v1.x*v2.x + v1.y*v2.y + v1.z*v2.z;
+	return ret;
+}
+
+V crossproduct(V u, V v) {
+	V cross(u.y*v.z - u.z*v.y, u.z*v.x - u.x*v.z, u.x*v.y - u.y*v.x);
+	return cross;
+}
 
 struct TreeNode {
 	int level, index;
@@ -28,7 +58,7 @@ struct TreeNode {
 float power(float a, int n) {
 	float res = 1;
 	for(int i=0; i<n; i++) {
-		res *= res;
+		res *= a;
 	}
 	return res;
 }
@@ -45,9 +75,11 @@ typedef enum {
 TreeNode* root;
 vector<TreeNode*> nodes;
 int N; // numNodes
+V windForce;
+float oscCoeff = 0.5, bendingCoeff = 75;
+float elasticMod = 40.5;
+float thisTime = 0.0;
 
-// cout<<root->index<<" "<<root->level<<" "<<root->mainAngle<<" "<<root->xAngle<<" "<<root->yAngle<<" "<<root->zAngle;
-// index, level, mainangle, xangle, yangle, zangle, child1, child2, child3
 void readTree() {
 	cin>>N;
 	cout<<"N = "<<N<<endl;
@@ -64,119 +96,109 @@ void readTree() {
 	return;
 }
 
-void traverseAndBuildTree(int index) {
-	// cout<<"index = "<<index<<endl;
-	// cout<<"N = "<<N<<endl;
+void traverseAndBuildTree(int index, float mAngle, float anglex, float angley, float anglez) {
+	// cout<<"time = "<<thisTime<<endl;
 	if(index <= N) {
 		TreeNode* node = nodes[index];
 		TreeNode* child1 = nodes[node->child1];
 		TreeNode* child2 = nodes[node->child2];
 		TreeNode* child3 = nodes[node->child3];
-		// if(index == 0) {
-		// 	cout<<"index1 = "<<node->index<<" begins"<<endl;
-		// 	cout<<node->child1<<" "<<node->child2<<" "<<node->child3<<" "<<endl;
-		// 	cout<<child1->level<<" "<<child2->level<<" "<<child3->level<<endl;
-		// }
-
 		float angle1y, angle1z;
+
+		bendingCoeff = 75 + (rand() % 6);
+
+		float t = 0.09*power(0.7, node->level);
+		float l = power(0.7, node->level);
+		float k = 100*(elasticMod*bendingCoeff*t*t*t)/(4*l*l);
+
+		float Px = windForce.x*(1 + oscCoeff*sin(thisTime + bendingCoeff));
+		float Pz = windForce.z*(1 + oscCoeff*sin(thisTime + bendingCoeff));
+		float dx = Px/k;
+		float dz = Pz/k;
+		float thetaZ = 2*asin(dx/l);
+		float thetaX = 2*asin(dz/l);
+		if(node->level == 4)
+			cout<<"theta = "<<(thetaX)<<" "<<(thetaZ)<<endl;
 
 		glCallList(BRANCH);
 		glPushMatrix();
-			// if(child1->mainAngle != child2->mainAngle || child1->mainAngle != child3->mainAngle) {
-			// 	cout<<"lul ho kaa? "<<index<<endl;
-			// 	cout<<child1->mainAngle<<" "<<child2->mainAngle<<" "<<child3->mainAngle<<endl;
-			// }
 			float mainAngle = child1->mainAngle;
 			glRotatef(mainAngle, 0, 1, 0);
-			glTranslatef(0, 1, 0);
+			glTranslatef(0, 2, 0);
 			glScalef(0.7, 0.7, 0.7);
 
 			glPushMatrix();
+				//rotate wind
+				glRotatef(-mAngle - mainAngle, 0, 1, 0);
+				glRotatef(-anglex, 1, 0, 0);
+				glRotatef(-angley, 0, 1, 0);
+				glRotatef(-anglez, 0, 0, 1);
+				glRotatef(thetaX, 1, 0, 0);
+				glRotatef(thetaZ, 0, 0, 1);
+				glRotatef(anglez, 0, 0, 1);
+				glRotatef(angley, 0, 1, 0);
+				glRotatef(anglex, 1, 0, 0);
+				glRotatef(mAngle + mainAngle, 0, 1, 0);
+				//rotate wind
 				angle1y = child1->yAngle;
 				angle1z = child1->zAngle;
 				glRotatef(angle1y, 0, 1, 0);
 				glRotatef(angle1z, 0, 0, 1);
 				if(child1->index != 0)
-					traverseAndBuildTree(child1->index);
+					traverseAndBuildTree(child1->index, mAngle + mainAngle, anglex + thetaX, angley + angle1y, anglez + angle1z + thetaZ);
 			glPopMatrix();
 			glPushMatrix();
+				//rotate wind
+				glRotatef(-mAngle - mainAngle, 0, 1, 0);
+				glRotatef(-anglex, 1, 0, 0);
+				glRotatef(-angley, 0, 1, 0);
+				glRotatef(-anglez, 0, 0, 1);
+				glRotatef(thetaX, 1, 0, 0);
+				glRotatef(thetaZ, 0, 0, 1);
+				glRotatef(anglez, 0, 0, 1);
+				glRotatef(angley, 0, 1, 0);
+				glRotatef(anglex, 1, 0, 0);
+				glRotatef(mAngle + mainAngle, 0, 1, 0);
+				//rotate wind
 				angle1y = child2->yAngle;
 				angle1z = child2->zAngle;
 				glRotatef(angle1y, 0, 1, 0);
 				glRotatef(angle1z, 0, 0, 1);
 				if(child2->index != 0)
-					traverseAndBuildTree(child2->index);
+					traverseAndBuildTree(child2->index, mAngle + mainAngle, anglex + thetaX, angley + angle1y, anglez + angle1z + thetaZ);
 			glPopMatrix();
 			glPushMatrix();
+				//rotate wind
+				glRotatef(-mAngle - mainAngle, 0, 1, 0);
+				glRotatef(-anglex, 1, 0, 0);
+				glRotatef(-angley, 0, 1, 0);
+				glRotatef(-anglez, 0, 0, 1);
+				glRotatef(thetaX, 1, 0, 0);
+				glRotatef(thetaZ, 0, 0, 1);
+				glRotatef(anglez, 0, 0, 1);
+				glRotatef(angley, 0, 1, 0);
+				glRotatef(anglex, 1, 0, 0);
+				glRotatef(mAngle + mainAngle, 0, 1, 0);
+				//rotate wind
 				angle1y = child3->yAngle;
 				angle1z = child3->zAngle;
 				glRotatef(angle1y, 0, 1, 0);
 				glRotatef(angle1z, 0, 0, 1);
 				if(child3->index != 0)
-					traverseAndBuildTree(child3->index);
+					traverseAndBuildTree(child3->index, mAngle + mainAngle, anglex + thetaX, angley + angle1y, anglez + angle1z + thetaZ);
 			glPopMatrix();
 		glPopMatrix();
 	}
-	// cout<<"index1 = "<<index<<" ends"<<endl;
-
 }
 
 
 void createTree() {
 	glPushMatrix();
 		glCallList(TREEMAT);
-		glTranslatef(0, -1, 0);
-		traverseAndBuildTree(0);
+		glTranslatef(0, -2, 0);
+		traverseAndBuildTree(0, 0.0, 0.0, 0.0, 0.0);
 	glPopMatrix();
 }
-
-// void PolarLookFrom(GLfloat dist, GLfloat elevation, GLfloat azimuth)
-// {
-//   glTranslatef(0, 0, -dist);
-//   glRotatef(elevation, 1, 0, 0);
-//   glRotatef(azimuth, 0, 1, 0);
-
-// }
-
-// void agvViewTransform(void)
-// { 
-//     PolarLookFrom(8.0, 30.0, 0.0);
-// }
-
-// void agvInit(int window)
-// {
-//   glutMouseFunc(agvHandleButton);
-//   glutMotionFunc(agvHandleMotion);
-//   glutKeyboardFunc(agvHandleKeys);
-//   RedisplayWindow = glutGetWindow();
-//   agvSetAllowIdle(window);
-// }
-
-// void agvMakeAxesList(int displaylistnum)
-// {
-//   int i,j;
-//   GLfloat axes_ambuse[] =   { 0.5, 0.0, 0.0, 1.0 };
-//   glNewList(displaylistnum, GL_COMPILE);
-//   glPushAttrib(GL_LIGHTING_BIT);
-//   glMatrixMode(GL_MODELVIEW);
-//     glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, axes_ambuse);
-//     glBegin(GL_LINES);
-//       glVertex3f(15, 0, 0); glVertex3f(-15, 0, 0);
-//       glVertex3f(0, 15, 0); glVertex3f(0, -15, 0);
-//       glVertex3f(0, 0, 15); glVertex3f(0, 0, -15);
-//     glEnd();
-//     for (i = 0; i < 3; i++) {
-//       glPushMatrix();
-//         glTranslatef(-10*(i==0), -10*(i==1), -10*(i==2));
-//         for (j = 0; j < 21; j++) {
-//           glutSolidCube(0.1);
-//           glTranslatef(i==0, i==1, i==2);
-// 	}
-//       glPopMatrix();
-//     }
-//   glPopAttrib();
-//   glEndList();  
-// }
 
 void display() {
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -191,11 +213,14 @@ void display() {
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
+	thisTime+= 1;
+	// cout<<"Creating Tree with time = "<<thisTime<<endl;
 	createTree();
 
 	glCallList(TREE);
 
 	glutSwapBuffers();
+	glutPostRedisplay();
 	glFlush();
 }
 
@@ -215,7 +240,7 @@ void createLists() {
 	glNewList(BRANCH, GL_COMPILE);
 	glPushMatrix();
 		glRotatef(-90, 1, 0, 0);
-		gluCylinder(cyl, 0.1, 0.08, 1, 10, 2);
+		gluCylinder(cyl, 0.1, 0.08, 2, 10, 2);
 	glPopMatrix();
 	glEndList();
 }
@@ -260,12 +285,11 @@ void myGLInit() {
 }
 
 int main(int argc, char* argv[]) {
-	// root = new TreeNode(0, 0.0, 0.0, 0.0, 0.0);
-	// root->index = 0, root->child1 = 1, root->child2 = 2, root->child3 = 3;
+	srand(time(NULL));
 	readTree();
 
 	glutInit(&argc, argv);
-	glutInitWindowSize(512, 512);
+	glutInitWindowSize(1280, 640);
 	glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGBA | GLUT_DEPTH | GLUT_MULTISAMPLE);
 	glutCreateWindow("TreeAnimation");
 
@@ -277,8 +301,11 @@ int main(int argc, char* argv[]) {
 	agvMakeAxesList(AXES);
 	myGLInit();
 
+	windForce.x = 2.0, windForce.y = 0.0, windForce.z = 0.0;
+
 	glutMainLoop();
 
 	return 0;
 	
 }
+
