@@ -68,7 +68,9 @@ typedef enum {
 	TREE,
 	BRANCH,
 	LEAF,
+	BRANCHANDLEAVES,
 	TREEMAT,
+	LEAFMAT,
 	AXES
 } DisplayLists;
 
@@ -78,7 +80,7 @@ int N; // numNodes
 V windForce;
 float oscCoeff = 0.5, bendingCoeff = 75;
 float elasticMod = 40.5;
-float thisTime = 0.0;
+int thisTime = 0;
 
 void readTree() {
 	cin>>N;
@@ -98,12 +100,19 @@ void readTree() {
 
 void traverseAndBuildTree(int index, float mAngle, float anglex, float angley, float anglez) {
 	// cout<<"time = "<<thisTime<<endl;
-	if(index <= N) {
-		TreeNode* node = nodes[index];
-		TreeNode* child1 = nodes[node->child1];
-		TreeNode* child2 = nodes[node->child2];
-		TreeNode* child3 = nodes[node->child3];
-		float angle1y, angle1z;
+	TreeNode* node = nodes[index];
+	TreeNode* child1 = nodes[node->child1];
+	TreeNode* child2 = nodes[node->child2];
+	TreeNode* child3 = nodes[node->child3];
+	float angle1y, angle1z;
+	if(node->level == 5) {
+		// cout<<"index = "<<index<<endl;
+		glPushMatrix();
+		glRotatef(node->mainAngle, 0, 1, 0);
+		glCallList(BRANCHANDLEAVES);
+		glPopMatrix();
+	}
+	if(index < N) {
 
 		bendingCoeff = 75 + (rand() % 6);
 
@@ -115,10 +124,10 @@ void traverseAndBuildTree(int index, float mAngle, float anglex, float angley, f
 		float Pz = windForce.z*(1 + oscCoeff*sin(thisTime + bendingCoeff));
 		float dx = Px/k;
 		float dz = Pz/k;
-		float thetaZ = 2*asin(dx/l);
-		float thetaX = 2*asin(dz/l);
-		if(node->level == 4)
-			cout<<"theta = "<<(thetaX)<<" "<<(thetaZ)<<endl;
+		float thetaZ = 20*asin(dx/l);
+		float thetaX = 20*asin(dz/l);
+		// if(node->level == 4)
+		// 	cout<<"theta = "<<(thetaX)<<" "<<(thetaZ)<<endl;
 
 		glCallList(BRANCH);
 		glPushMatrix();
@@ -243,6 +252,43 @@ void createLists() {
 		gluCylinder(cyl, 0.1, 0.08, 2, 10, 2);
 	glPopMatrix();
 	glEndList();
+
+	glNewList(LEAF, GL_COMPILE);  
+	glBegin(GL_TRIANGLES);
+	    glNormal3f(-0.1, 0, 0.25);  
+	    glVertex3f(0, 0, 0);
+	    glVertex3f(0.5, 0.5, 0.2);
+	    glVertex3f(0, 1.0, 0);
+	 
+	    glNormal3f(0.1, 0, 0.25);
+	    glVertex3f(0, 0, 0);
+	    glVertex3f(0, 1.0, 0);
+	    glVertex3f(-0.5, 0.5, 0.2);
+	glEnd();
+	glEndList();
+
+	glNewList(BRANCHANDLEAVES, GL_COMPILE);
+	glPushMatrix();
+		glPushAttrib(GL_LIGHTING_BIT);
+		glCallList(BRANCH);
+		glCallList(LEAFMAT);
+		for(int i=0; i<3; i++) {
+			glTranslatef(0, 2*0.333, 0);
+			glRotatef(90, 0, 1, 0);
+			glPushMatrix();	
+				glRotatef(0, 0, 1, 0);
+				glRotatef(50, 1, 0, 0);
+				glCallList(LEAF);
+			glPopMatrix();
+			glPushMatrix();
+				glRotatef(180, 0, 1, 0);
+				glRotatef(60, 1, 0, 0);
+				glCallList(LEAF);
+			glPopMatrix();
+		}
+		glPopAttrib();
+	glPopMatrix();
+	glEndList();
 }
 
 void myGLInit() {
@@ -258,6 +304,10 @@ void myGLInit() {
 	GLfloat tree_specular[] = { 0.0, 0.0, 0.0, 1.0 };
 	GLfloat tree_shininess[] = { 0 };
 
+	GLfloat leaf_ambuse[] =   { 0.0, 0.8, 0.0, 1.0 };
+	GLfloat leaf_specular[] = { 0.0, 0.8, 0.0, 1.0 };
+	GLfloat leaf_shininess[] = { 10 };
+
 	glLightfv(GL_LIGHT0, GL_AMBIENT, l_ambient);
 	glLightfv(GL_LIGHT0, GL_DIFFUSE, l_diffuse);
 	glLightfv(GL_LIGHT0, GL_SPECULAR, l_specular);
@@ -269,6 +319,12 @@ void myGLInit() {
 		glMaterialfv(GL_FRONT, GL_AMBIENT_AND_DIFFUSE, tree_amb_diff);
 		glMaterialfv(GL_FRONT, GL_SPECULAR, tree_specular);
 		glMaterialfv(GL_FRONT, GL_SHININESS, tree_shininess);
+	glEndList();
+
+	glNewList(LEAFMAT, GL_COMPILE);
+	    glMaterialfv(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE, leaf_ambuse);
+	    glMaterialfv(GL_FRONT_AND_BACK, GL_SPECULAR, leaf_specular);
+	    glMaterialfv(GL_FRONT_AND_BACK, GL_SHININESS, leaf_shininess);
 	glEndList();
 
 	glEnable(GL_LIGHTING);
@@ -301,7 +357,7 @@ int main(int argc, char* argv[]) {
 	agvMakeAxesList(AXES);
 	myGLInit();
 
-	windForce.x = 2.0, windForce.y = 0.0, windForce.z = 0.0;
+	windForce.x = -2.0, windForce.y = 0.0, windForce.z = 0.0;
 
 	glutMainLoop();
 
