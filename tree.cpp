@@ -1,3 +1,10 @@
+/*
+The tree has been adapted from the OpenGL example tree, which is drawn using fractals.
+The files agviewer.c and agviewer.h have been taken directly from the OpenGL website.
+They are for viewing.
+*/
+
+
 #include <iostream>
 #include <stdlib.h>
 #include <limits.h>

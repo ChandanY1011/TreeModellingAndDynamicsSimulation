@@ -1,3 +1,9 @@
+/*
+The tree has been adapted from the OpenGL example tree, which is drawn using fractals.
+The files agviewer.c and agviewer.h have been taken directly from the OpenGL website.
+They are for viewing.
+*/
+
 #include <iostream>
 #include <stdlib.h>
 #include <limits.h>
@@ -126,8 +132,6 @@ void traverseAndBuildTree(int index, float mAngle, float anglex, float angley, f
 		float dz = Pz/k;
 		float thetaZ = 20*asin(dx/l);
 		float thetaX = 20*asin(dz/l);
-		// if(node->level == 4)
-		// 	cout<<"theta = "<<(thetaX)<<" "<<(thetaZ)<<endl;
 
 		glCallList(BRANCH);
 		glPushMatrix();
@@ -357,7 +361,7 @@ int main(int argc, char* argv[]) {
 	agvMakeAxesList(AXES);
 	myGLInit();
 
-	windForce.x = -2.0, windForce.y = 0.0, windForce.z = 0.0;
+	windForce.x = 2.0, windForce.y = 0.0, windForce.z = 0.0;
 
 	glutMainLoop();
 
